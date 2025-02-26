@@ -2,7 +2,7 @@ use std::{net::SocketAddr, process::exit};
 
 use anyhow::Result;
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
     spawn,
 };
@@ -17,7 +17,7 @@ fn tracing_setup() {
 }
 
 #[instrument]
-async fn process(stream: TcpStream, address: SocketAddr) -> Result<()> {
+async fn process(stream: &mut TcpStream, address: SocketAddr) -> Result<()> {
     info!("processing request from {:?}", address);
 
     let mut buf = BufReader::new(stream);
@@ -31,6 +31,8 @@ async fn process(stream: TcpStream, address: SocketAddr) -> Result<()> {
         _ => {}
     }
 
+    buf.write_all(b"# lexi\r\nit's working!").await?;
+
     Ok(())
 }
 
@@ -43,8 +45,8 @@ async fn main() -> Result<()> {
     info!("listening on {}", &server_address);
     if let Ok(listener) = TcpListener::bind(&server_address).await {
         loop {
-            let (socket, address) = listener.accept().await?;
-            spawn(async move { process(socket, address).await });
+            let (mut socket, address) = listener.accept().await?;
+            spawn(async move { process(&mut socket, address).await });
         }
     }
 
